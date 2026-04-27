@@ -6,13 +6,34 @@ APP_NAME="${PCLOUD_APP_NAME:-pCloud Drive}"
 APP_BUNDLE_ID="${PCLOUD_APP_BUNDLE_ID:-com.pcloud.pcloud.macos}"
 DRIVE_PATH="${PCLOUD_DRIVE_PATH:-${HOME}/pCloud Drive}"
 LOG_FILE="${PCLOUD_WATCHDOG_LOG_FILE:-${HOME}/Library/Logs/pcloud-drive-watchdog.log}"
+STATE_DIR="${PCLOUD_STATE_DIR:-${HOME}/Library/Application Support/pcloud-drive-watchdog}"
+FAILURE_THRESHOLD="${PCLOUD_FAILURE_THRESHOLD:-2}"
+VERBOSE="${PCLOUD_VERBOSE:-0}"
 LOCK_DIR="${TMPDIR:-/tmp}/pcloud-drive-watchdog.lock"
 PCLOUD_APP_PATH="${PCLOUD_APP_PATH:-}"
-readonly APP_NAME APP_BUNDLE_ID DRIVE_PATH LOG_FILE LOCK_DIR PCLOUD_APP_PATH
+FAILURE_COUNT_FILE="${STATE_DIR}/failure-count"
+readonly APP_NAME APP_BUNDLE_ID DRIVE_PATH LOG_FILE STATE_DIR FAILURE_THRESHOLD VERBOSE LOCK_DIR PCLOUD_APP_PATH FAILURE_COUNT_FILE
 
 log() {
+  mkdir -p "$(dirname -- "${LOG_FILE}")"
   timestamp="$(date '+%Y-%m-%d %H:%M:%S %z')"
   printf '%s %s\n' "${timestamp}" "$*" >> "${LOG_FILE}"
+}
+
+validate_failure_threshold() {
+  case "${FAILURE_THRESHOLD}" in
+    '' | *[!0-9]*)
+      log "Invalid PCLOUD_FAILURE_THRESHOLD='${FAILURE_THRESHOLD}'; expected 1-999"
+      return 1
+      ;;
+    *)
+      ;;
+  esac
+
+  if [ "${FAILURE_THRESHOLD}" -lt 1 ] || [ "${FAILURE_THRESHOLD}" -gt 999 ]; then
+    log "Invalid PCLOUD_FAILURE_THRESHOLD='${FAILURE_THRESHOLD}'; expected 1-999"
+    return 1
+  fi
 }
 
 cleanup() {
@@ -155,6 +176,60 @@ network_reachable() {
   scutil -r www.pcloud.com 2>/dev/null | grep -q 'Reachable'
 }
 
+failure_count() {
+  if [ ! -f "${FAILURE_COUNT_FILE}" ]; then
+    printf '%s\n' 0
+    return 0
+  fi
+
+  count="$(cat "${FAILURE_COUNT_FILE}" 2>/dev/null || printf '%s\n' 0)"
+  case "${count}" in
+    '' | *[!0-9]*)
+      printf '%s\n' 0
+      ;;
+    *)
+      printf '%s\n' "${count}"
+      ;;
+  esac
+}
+
+reset_failure_count() {
+  previous_count="$(failure_count)"
+  rm -f "${FAILURE_COUNT_FILE}" 2>/dev/null || true
+
+  if [ "${previous_count}" -gt 0 ]; then
+    log "Healthy: cleared ${previous_count} consecutive failed check(s)"
+  elif [ "${VERBOSE}" = "1" ]; then
+    log "Healthy: process, mount, and drive content are present"
+  fi
+}
+
+record_failure() {
+  reason="$1"
+  previous_count="$(failure_count)"
+  next_count=$((previous_count + 1))
+
+  mkdir -p "${STATE_DIR}"
+  printf '%s\n' "${next_count}" > "${FAILURE_COUNT_FILE}"
+
+  if [ "${next_count}" -lt "${FAILURE_THRESHOLD}" ]; then
+    log "Failure ${next_count}/${FAILURE_THRESHOLD}: ${reason}; waiting for another failed check before restart"
+    return 1
+  fi
+
+  log "Failure ${next_count}/${FAILURE_THRESHOLD}: ${reason}; restart threshold reached"
+  return 0
+}
+
+restart_after_failure() {
+  reason="$1"
+
+  if record_failure "${reason}"; then
+    restart_pcloud "${reason}"
+    rm -f "${FAILURE_COUNT_FILE}" 2>/dev/null || true
+  fi
+}
+
 restart_pcloud() {
   reason="$1"
   app_path="$(detect_app_path)"
@@ -177,6 +252,10 @@ restart_pcloud() {
 }
 
 main() {
+  if ! validate_failure_threshold; then
+    return 1
+  fi
+
   if ! acquire_lock; then
     log "Skipped: another watchdog run is active"
     return 0
@@ -184,12 +263,12 @@ main() {
   trap cleanup EXIT INT TERM
 
   if ! has_process; then
-    restart_pcloud "app process is not running"
+    restart_after_failure "app process is not running"
     return 0
   fi
 
   if ! has_mount; then
-    restart_pcloud "pCloudFS mount is missing"
+    restart_after_failure "pCloudFS mount is missing"
     return 0
   fi
 
@@ -207,14 +286,14 @@ main() {
     fi
 
     if network_reachable; then
-      restart_pcloud "drive is mounted but has no visible cloud content"
+      restart_after_failure "drive is mounted but has no visible cloud content"
     else
       log "Skipped restart: drive content is unavailable and pCloud is not reachable"
     fi
     return 0
   fi
 
-  log "Healthy: process, mount, and drive content are present"
+  reset_failure_count
 }
 
 case "${1:-}" in

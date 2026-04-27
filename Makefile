@@ -1,26 +1,50 @@
-.PHONY: install lint uninstall
+.PHONY: config configure install lint test uninstall
 
-SHELL_SCRIPTS := src/pcloud-drive-watchdog.sh scripts/install.sh scripts/uninstall.sh
+SHELL_SCRIPTS := src/pcloud-drive-watchdog.sh scripts/install.sh scripts/uninstall.sh tests/install_configure_tests.sh
 MARKDOWN_FILES := README.md LICENSE.md
 MARKDOWNLINT_CONFIG := .markdownlint.json
 INTERVAL_SECONDS ?=
+PCLOUD_FAILURE_THRESHOLD ?=
 PCLOUD_APP_PATH ?=
 PCLOUD_APP_NAME ?=
 PCLOUD_APP_BUNDLE_ID ?=
 PCLOUD_DRIVE_PATH ?=
 PCLOUD_WATCHDOG_LOG_FILE ?=
+PCLOUD_STATE_DIR ?=
+PCLOUD_VERBOSE ?= 0
 NO_LAUNCH ?= 0
 REMOVE_LOGS ?= 0
+FORCE ?= 0
 
 install:
 	@INTERVAL_SECONDS="$(INTERVAL_SECONDS)" \
+		PCLOUD_FAILURE_THRESHOLD="$(PCLOUD_FAILURE_THRESHOLD)" \
 		PCLOUD_APP_PATH="$(PCLOUD_APP_PATH)" \
 		PCLOUD_APP_NAME="$(PCLOUD_APP_NAME)" \
 		PCLOUD_APP_BUNDLE_ID="$(PCLOUD_APP_BUNDLE_ID)" \
 		PCLOUD_DRIVE_PATH="$(PCLOUD_DRIVE_PATH)" \
 		PCLOUD_WATCHDOG_LOG_FILE="$(PCLOUD_WATCHDOG_LOG_FILE)" \
+		PCLOUD_STATE_DIR="$(PCLOUD_STATE_DIR)" \
+		PCLOUD_VERBOSE="$(PCLOUD_VERBOSE)" \
 		NO_LAUNCH="$(NO_LAUNCH)" \
-		./scripts/install.sh
+		FORCE="$(FORCE)" \
+		./scripts/install.sh install
+
+configure:
+	@INTERVAL_SECONDS="$(INTERVAL_SECONDS)" \
+		PCLOUD_FAILURE_THRESHOLD="$(PCLOUD_FAILURE_THRESHOLD)" \
+		PCLOUD_APP_PATH="$(PCLOUD_APP_PATH)" \
+		PCLOUD_APP_NAME="$(PCLOUD_APP_NAME)" \
+		PCLOUD_APP_BUNDLE_ID="$(PCLOUD_APP_BUNDLE_ID)" \
+		PCLOUD_DRIVE_PATH="$(PCLOUD_DRIVE_PATH)" \
+		PCLOUD_WATCHDOG_LOG_FILE="$(PCLOUD_WATCHDOG_LOG_FILE)" \
+		PCLOUD_STATE_DIR="$(PCLOUD_STATE_DIR)" \
+		PCLOUD_VERBOSE="$(PCLOUD_VERBOSE)" \
+		NO_LAUNCH="$(NO_LAUNCH)" \
+		FORCE="$(FORCE)" \
+		./scripts/install.sh configure
+
+config: configure
 
 uninstall:
 	@REMOVE_LOGS="$(REMOVE_LOGS)" ./scripts/uninstall.sh
@@ -28,3 +52,6 @@ uninstall:
 lint:
 	@shellcheck --enable=all $(SHELL_SCRIPTS)
 	@markdownlint -c $(MARKDOWNLINT_CONFIG) $(MARKDOWN_FILES)
+
+test:
+	@./tests/install_configure_tests.sh

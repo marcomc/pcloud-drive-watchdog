@@ -14,6 +14,7 @@ stable.
 - [What It Does](#what-it-does)
 - [Requirements](#requirements)
 - [Install](#install)
+- [Reconfigure](#reconfigure)
 - [Uninstall](#uninstall)
 - [Configuration](#configuration)
 - [Logs](#logs)
@@ -45,8 +46,11 @@ The watchdog runs periodically through `launchd` and checks three conditions:
 - `~/pCloud Drive` is mounted as `pcloudfs`;
 - the mounted drive contains visible cloud content.
 
-If one of those checks fails, the script asks pCloud Drive to quit, waits, stops
-leftover pCloud helper processes, and opens pCloud Drive again.
+If one of those checks fails repeatedly, the script asks pCloud Drive to quit,
+waits, stops leftover pCloud helper processes, and opens pCloud Drive again.
+The default policy checks every 5 minutes and restarts after 2 consecutive
+failed checks. That avoids reacting to short mount warm-up periods or transient
+network hiccups.
 
 The script includes a short warm-up guard so it does not restart pCloud while
 the app is still mounting the drive after a fresh launch.
@@ -67,14 +71,38 @@ Clone the project, then run:
 make install
 ```
 
-The installer detects `pCloud Drive.app`, asks for a check interval, generates a
-LaunchAgent for the current user, and starts it immediately.
+The installer detects `pCloud Drive.app`, asks for a check interval and a
+consecutive failure threshold, generates a LaunchAgent for the current user, and
+starts it immediately.
 
-The default check interval is `60` seconds. To install without an interactive
-prompt, pass `INTERVAL_SECONDS`:
+The default check interval is `300` seconds. The default restart threshold is
+`2` consecutive failed checks. To install without an interactive prompt, pass
+the values explicitly:
 
 ```sh
-INTERVAL_SECONDS=300 make install
+INTERVAL_SECONDS=300 PCLOUD_FAILURE_THRESHOLD=2 make install
+```
+
+If the watchdog is already installed, `make install` does not overwrite the
+current LaunchAgent. Use `make configure` to change settings or use
+`FORCE=1 make install` to reinstall the files anyway.
+
+## Reconfigure
+
+To update an existing installation:
+
+```sh
+make configure
+```
+
+`make config` is also available as a shorter alias. The command asks for the new
+check interval and the number of consecutive failed checks required before a
+restart, then reloads the LaunchAgent.
+
+For unattended reconfiguration:
+
+```sh
+INTERVAL_SECONDS=600 PCLOUD_FAILURE_THRESHOLD=3 make configure
 ```
 
 If pCloud Drive is installed in an unusual location, pass `PCLOUD_APP_PATH`:
@@ -113,6 +141,7 @@ The installer writes:
 - `~/Library/LaunchAgents/com.marcomc.pcloud-drive-watchdog.plist`
 
 The LaunchAgent stores the chosen check interval in `StartInterval`.
+It stores the restart threshold in `PCLOUD_FAILURE_THRESHOLD`.
 
 The runtime script also supports these environment variables:
 
@@ -122,10 +151,15 @@ The runtime script also supports these environment variables:
   `com.pcloud.pcloud.macos`;
 - `PCLOUD_DRIVE_PATH`: mounted drive path, default `~/pCloud Drive`;
 - `PCLOUD_WATCHDOG_LOG_FILE`: log file path.
+- `PCLOUD_FAILURE_THRESHOLD`: consecutive failed checks before restart, default
+  `2`, allowed range `1` through `999`;
+- `PCLOUD_STATE_DIR`: small state directory used to count consecutive failed
+  checks, default `~/Library/Application Support/pcloud-drive-watchdog`;
+- `PCLOUD_VERBOSE`: set to `1` to log every healthy check.
 
-When these variables are passed to `make install`, the generated LaunchAgent
-persists them for scheduled watchdog runs. Most users should only need
-`INTERVAL_SECONDS`.
+When these variables are passed to `make install` or `make configure`, the
+generated LaunchAgent persists them for scheduled watchdog runs. Most users
+should only need `INTERVAL_SECONDS` and `PCLOUD_FAILURE_THRESHOLD`.
 
 Set `NO_LAUNCH=1` during install when you want to inspect the generated files
 before loading the LaunchAgent.
