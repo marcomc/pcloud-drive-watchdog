@@ -1,0 +1,30 @@
+.PHONY: install lint uninstall
+
+SHELL_SCRIPTS := src/pcloud-drive-watchdog.sh scripts/install.sh scripts/uninstall.sh
+MARKDOWN_FILES := README.md LICENSE.md
+MARKDOWNLINT_CONFIG := .markdownlint.json
+INTERVAL_SECONDS ?=
+PCLOUD_APP_PATH ?=
+PCLOUD_APP_NAME ?=
+PCLOUD_APP_BUNDLE_ID ?=
+PCLOUD_DRIVE_PATH ?=
+PCLOUD_WATCHDOG_LOG_FILE ?=
+NO_LAUNCH ?= 0
+REMOVE_LOGS ?= 0
+
+install:
+	@INTERVAL_SECONDS="$(INTERVAL_SECONDS)" \
+		PCLOUD_APP_PATH="$(PCLOUD_APP_PATH)" \
+		PCLOUD_APP_NAME="$(PCLOUD_APP_NAME)" \
+		PCLOUD_APP_BUNDLE_ID="$(PCLOUD_APP_BUNDLE_ID)" \
+		PCLOUD_DRIVE_PATH="$(PCLOUD_DRIVE_PATH)" \
+		PCLOUD_WATCHDOG_LOG_FILE="$(PCLOUD_WATCHDOG_LOG_FILE)" \
+		NO_LAUNCH="$(NO_LAUNCH)" \
+		./scripts/install.sh
+
+uninstall:
+	@REMOVE_LOGS="$(REMOVE_LOGS)" ./scripts/uninstall.sh
+
+lint:
+	@shellcheck --enable=all $(SHELL_SCRIPTS)
+	@markdownlint -c $(MARKDOWNLINT_CONFIG) $(MARKDOWN_FILES)

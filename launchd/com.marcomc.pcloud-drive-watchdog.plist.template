@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.marcomc.pcloud-drive-watchdog</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__WATCHDOG_SCRIPT__</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PCLOUD_APP_PATH</key>
+    <string>__PCLOUD_APP_PATH__</string>
+    <key>PCLOUD_APP_NAME</key>
+    <string>__PCLOUD_APP_NAME__</string>
+    <key>PCLOUD_APP_BUNDLE_ID</key>
+    <string>__PCLOUD_APP_BUNDLE_ID__</string>
+    <key>PCLOUD_DRIVE_PATH</key>
+    <string>__PCLOUD_DRIVE_PATH__</string>
+    <key>PCLOUD_WATCHDOG_LOG_FILE</key>
+    <string>__PCLOUD_WATCHDOG_LOG_FILE__</string>
+  </dict>
+  <key>StartInterval</key>
+  <integer>__START_INTERVAL__</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>__LOG_DIR__/pcloud-drive-watchdog.stdout.log</string>
+  <key>StandardErrorPath</key>
+  <string>__LOG_DIR__/pcloud-drive-watchdog.stderr.log</string>
+</dict>
+</plist>
