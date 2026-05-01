@@ -8,6 +8,8 @@ the official pCloud Drive application. It is only a companion workaround for a
 failure mode that should ideally disappear once the official macOS client is
 stable.
 
+Current version: `0.1.0`.
+
 ## Table of Contents
 
 - [Problem](#problem)
@@ -17,6 +19,7 @@ stable.
 - [Reconfigure](#reconfigure)
 - [Uninstall](#uninstall)
 - [Configuration](#configuration)
+- [Script Interface](#script-interface)
 - [Logs](#logs)
 - [Troubleshooting](#troubleshooting)
 - [References](#references)
@@ -156,6 +159,12 @@ The runtime script also supports these environment variables:
 - `PCLOUD_STATE_DIR`: small state directory used to count consecutive failed
   checks, default `~/Library/Application Support/pcloud-drive-watchdog`;
 - `PCLOUD_VERBOSE`: set to `1` to log every healthy check.
+- `PCLOUD_QUIT_EVENT_TIMEOUT_SECONDS`: seconds to wait for the AppleEvent quit
+  request before continuing with process termination, default `5`;
+- `PCLOUD_QUIT_WAIT_SECONDS`: seconds to wait after requesting quit before
+  checking for remaining pCloud processes, default `8`;
+- `PCLOUD_FORCE_KILL_WAIT_SECONDS`: seconds to wait after `SIGTERM` before
+  escalating to `SIGKILL`, default `2`.
 
 When these variables are passed to `make install` or `make configure`, the
 generated LaunchAgent persists them for scheduled watchdog runs. Most users
@@ -163,6 +172,50 @@ should only need `INTERVAL_SECONDS` and `PCLOUD_FAILURE_THRESHOLD`.
 
 Set `NO_LAUNCH=1` during install when you want to inspect the generated files
 before loading the LaunchAgent.
+
+## Script Interface
+
+The installed watchdog script is:
+
+```text
+~/.local/bin/pcloud-drive-watchdog.sh
+```
+
+Supported command-line options:
+
+- no arguments: run one watchdog check cycle;
+- `--help` or `-h`: print the supported options;
+- `--version`: print the watchdog version;
+- `--detect-app-path`: print the detected `pCloud Drive.app` path and exit.
+
+Examples:
+
+```sh
+~/.local/bin/pcloud-drive-watchdog.sh
+~/.local/bin/pcloud-drive-watchdog.sh --help
+~/.local/bin/pcloud-drive-watchdog.sh --version
+PCLOUD_APP_PATH="/Applications/pCloud Drive.app" \
+  ~/.local/bin/pcloud-drive-watchdog.sh --detect-app-path
+```
+
+Supported runtime environment variables:
+
+- `PCLOUD_APP_PATH`: override the detected `pCloud Drive.app` path;
+- `PCLOUD_APP_NAME`: override the app display name used in path detection;
+- `PCLOUD_APP_BUNDLE_ID`: override the app bundle identifier used for
+  AppleEvent quit and `open -b`;
+- `PCLOUD_DRIVE_PATH`: override the expected mount point path;
+- `PCLOUD_WATCHDOG_LOG_FILE`: override the main watchdog log file path;
+- `PCLOUD_FAILURE_THRESHOLD`: set the number of consecutive failed checks
+  required before restart, valid range `1` through `999`;
+- `PCLOUD_STATE_DIR`: override the state directory used for the failure counter;
+- `PCLOUD_VERBOSE`: set to `1` to log healthy checks too;
+- `PCLOUD_QUIT_EVENT_TIMEOUT_SECONDS`: limit how long the script waits for the
+  AppleEvent quit request before continuing with process termination;
+- `PCLOUD_QUIT_WAIT_SECONDS`: wait after requesting quit before checking for
+  remaining pCloud processes;
+- `PCLOUD_FORCE_KILL_WAIT_SECONDS`: wait after `SIGTERM` before escalating to
+  `SIGKILL`.
 
 ## Logs
 

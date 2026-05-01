@@ -1,6 +1,6 @@
 .PHONY: config configure install lint test uninstall
 
-SHELL_SCRIPTS := src/pcloud-drive-watchdog.sh scripts/install.sh scripts/uninstall.sh tests/install_configure_tests.sh
+SHELL_SCRIPTS := src/pcloud-drive-watchdog.sh scripts/install.sh scripts/uninstall.sh tests/install_configure_tests.sh tests/runtime_restart_tests.sh
 MARKDOWN_FILES := README.md LICENSE.md
 MARKDOWNLINT_CONFIG := .markdownlint.json
 INTERVAL_SECONDS ?=
@@ -12,6 +12,9 @@ PCLOUD_DRIVE_PATH ?=
 PCLOUD_WATCHDOG_LOG_FILE ?=
 PCLOUD_STATE_DIR ?=
 PCLOUD_VERBOSE ?= 0
+PCLOUD_QUIT_EVENT_TIMEOUT_SECONDS ?=
+PCLOUD_QUIT_WAIT_SECONDS ?=
+PCLOUD_FORCE_KILL_WAIT_SECONDS ?=
 NO_LAUNCH ?= 0
 REMOVE_LOGS ?= 0
 FORCE ?= 0
@@ -26,6 +29,9 @@ install:
 		PCLOUD_WATCHDOG_LOG_FILE="$(PCLOUD_WATCHDOG_LOG_FILE)" \
 		PCLOUD_STATE_DIR="$(PCLOUD_STATE_DIR)" \
 		PCLOUD_VERBOSE="$(PCLOUD_VERBOSE)" \
+		PCLOUD_QUIT_EVENT_TIMEOUT_SECONDS="$(PCLOUD_QUIT_EVENT_TIMEOUT_SECONDS)" \
+		PCLOUD_QUIT_WAIT_SECONDS="$(PCLOUD_QUIT_WAIT_SECONDS)" \
+		PCLOUD_FORCE_KILL_WAIT_SECONDS="$(PCLOUD_FORCE_KILL_WAIT_SECONDS)" \
 		NO_LAUNCH="$(NO_LAUNCH)" \
 		FORCE="$(FORCE)" \
 		./scripts/install.sh install
@@ -40,6 +46,9 @@ configure:
 		PCLOUD_WATCHDOG_LOG_FILE="$(PCLOUD_WATCHDOG_LOG_FILE)" \
 		PCLOUD_STATE_DIR="$(PCLOUD_STATE_DIR)" \
 		PCLOUD_VERBOSE="$(PCLOUD_VERBOSE)" \
+		PCLOUD_QUIT_EVENT_TIMEOUT_SECONDS="$(PCLOUD_QUIT_EVENT_TIMEOUT_SECONDS)" \
+		PCLOUD_QUIT_WAIT_SECONDS="$(PCLOUD_QUIT_WAIT_SECONDS)" \
+		PCLOUD_FORCE_KILL_WAIT_SECONDS="$(PCLOUD_FORCE_KILL_WAIT_SECONDS)" \
 		NO_LAUNCH="$(NO_LAUNCH)" \
 		FORCE="$(FORCE)" \
 		./scripts/install.sh configure
@@ -55,3 +64,4 @@ lint:
 
 test:
 	@./tests/install_configure_tests.sh
+	@./tests/runtime_restart_tests.sh

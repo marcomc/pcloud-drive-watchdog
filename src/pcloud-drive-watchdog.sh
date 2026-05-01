@@ -2,6 +2,7 @@
 
 set -u
 
+WATCHDOG_VERSION="0.1.0"
 APP_NAME="${PCLOUD_APP_NAME:-pCloud Drive}"
 APP_BUNDLE_ID="${PCLOUD_APP_BUNDLE_ID:-com.pcloud.pcloud.macos}"
 DRIVE_PATH="${PCLOUD_DRIVE_PATH:-${HOME}/pCloud Drive}"
@@ -9,10 +10,13 @@ LOG_FILE="${PCLOUD_WATCHDOG_LOG_FILE:-${HOME}/Library/Logs/pcloud-drive-watchdog
 STATE_DIR="${PCLOUD_STATE_DIR:-${HOME}/Library/Application Support/pcloud-drive-watchdog}"
 FAILURE_THRESHOLD="${PCLOUD_FAILURE_THRESHOLD:-2}"
 VERBOSE="${PCLOUD_VERBOSE:-0}"
+QUIT_EVENT_TIMEOUT_SECONDS="${PCLOUD_QUIT_EVENT_TIMEOUT_SECONDS:-5}"
+QUIT_WAIT_SECONDS="${PCLOUD_QUIT_WAIT_SECONDS:-8}"
+FORCE_KILL_WAIT_SECONDS="${PCLOUD_FORCE_KILL_WAIT_SECONDS:-2}"
 LOCK_DIR="${TMPDIR:-/tmp}/pcloud-drive-watchdog.lock"
 PCLOUD_APP_PATH="${PCLOUD_APP_PATH:-}"
 FAILURE_COUNT_FILE="${STATE_DIR}/failure-count"
-readonly APP_NAME APP_BUNDLE_ID DRIVE_PATH LOG_FILE STATE_DIR FAILURE_THRESHOLD VERBOSE LOCK_DIR PCLOUD_APP_PATH FAILURE_COUNT_FILE
+readonly WATCHDOG_VERSION APP_NAME APP_BUNDLE_ID DRIVE_PATH LOG_FILE STATE_DIR FAILURE_THRESHOLD VERBOSE QUIT_EVENT_TIMEOUT_SECONDS QUIT_WAIT_SECONDS FORCE_KILL_WAIT_SECONDS LOCK_DIR PCLOUD_APP_PATH FAILURE_COUNT_FILE
 
 log() {
   mkdir -p "$(dirname -- "${LOG_FILE}")"
@@ -34,6 +38,20 @@ validate_failure_threshold() {
     log "Invalid PCLOUD_FAILURE_THRESHOLD='${FAILURE_THRESHOLD}'; expected 1-999"
     return 1
   fi
+}
+
+validate_wait_seconds() {
+  value="$1"
+  name="$2"
+
+  case "${value}" in
+    '' | *[!0-9]*)
+      log "Invalid ${name}='${value}'; expected a non-negative integer"
+      return 1
+      ;;
+    *)
+      ;;
+  esac
 }
 
 cleanup() {
@@ -125,6 +143,11 @@ app_executable() {
 has_process() {
   executable="$(app_executable)" || return 1
   pgrep -f "${executable}" >/dev/null
+}
+
+process_pids() {
+  executable="$(app_executable)" || return 1
+  pgrep -f "${executable}"
 }
 
 process_age_seconds() {
@@ -230,6 +253,26 @@ restart_after_failure() {
   fi
 }
 
+request_app_quit() {
+  osascript -e "tell application id \"${APP_BUNDLE_ID}\" to quit" >/dev/null 2>&1 &
+  quit_pid=$!
+
+  (
+    sleep "${QUIT_EVENT_TIMEOUT_SECONDS}"
+    if kill -0 "${quit_pid}" 2>/dev/null; then
+      log "AppleEvent quit timed out after ${QUIT_EVENT_TIMEOUT_SECONDS}s; continuing with process termination"
+      kill -TERM "${quit_pid}" 2>/dev/null || true
+      sleep 1
+      kill -KILL "${quit_pid}" 2>/dev/null || true
+    fi
+  ) &
+  quit_watcher_pid=$!
+
+  wait "${quit_pid}" >/dev/null 2>&1 || true
+  kill "${quit_watcher_pid}" 2>/dev/null || true
+  wait "${quit_watcher_pid}" 2>/dev/null || true
+}
+
 restart_pcloud() {
   reason="$1"
   app_path="$(detect_app_path)"
@@ -240,19 +283,39 @@ restart_pcloud() {
   fi
 
   log "Restarting ${APP_NAME}: ${reason}"
-  osascript -e "tell application id \"${APP_BUNDLE_ID}\" to quit" >/dev/null 2>&1 || true
-  sleep 8
-  executable="$(app_executable)" || executable=""
-  if [ -n "${executable}" ]; then
-    pkill -f "${executable}" >/dev/null 2>&1 || true
+  request_app_quit
+  sleep "${QUIT_WAIT_SECONDS}"
+
+  pids="$(process_pids 2>/dev/null || true)"
+  if [ -n "${pids}" ]; then
+    log "Sending SIGTERM to ${APP_NAME} process(es): ${pids}"
+    executable="$(app_executable)" || executable=""
+    if [ -n "${executable}" ]; then
+      pkill -f "${executable}" >/dev/null 2>&1 || true
+    fi
+    sleep "${FORCE_KILL_WAIT_SECONDS}"
+    pids="$(process_pids 2>/dev/null || true)"
+    if [ -n "${pids}" ]; then
+      log "Force-killing unresponsive ${APP_NAME} process(es): ${pids}"
+      pkill -KILL -f "${executable}" >/dev/null 2>&1 || true
+    fi
   fi
   pkill -f "com.pcloud.pcloudfs.Mounter.Helper" >/dev/null 2>&1 || true
-  sleep 2
+  sleep "${FORCE_KILL_WAIT_SECONDS}"
   open -b "${APP_BUNDLE_ID}" >/dev/null 2>&1 || open "${app_path}" >/dev/null 2>&1
 }
 
 main() {
   if ! validate_failure_threshold; then
+    return 1
+  fi
+  if ! validate_wait_seconds "${QUIT_WAIT_SECONDS}" "PCLOUD_QUIT_WAIT_SECONDS"; then
+    return 1
+  fi
+  if ! validate_wait_seconds "${QUIT_EVENT_TIMEOUT_SECONDS}" "PCLOUD_QUIT_EVENT_TIMEOUT_SECONDS"; then
+    return 1
+  fi
+  if ! validate_wait_seconds "${FORCE_KILL_WAIT_SECONDS}" "PCLOUD_FORCE_KILL_WAIT_SECONDS"; then
     return 1
   fi
 
@@ -301,7 +364,11 @@ case "${1:-}" in
     detect_app_path
     ;;
   --help | -h)
-    printf 'Usage: %s [--detect-app-path]\n' "$0"
+    printf 'Usage: %s [--detect-app-path|--help|--version]\n' "$0"
+    printf 'Run with no arguments to execute one watchdog check cycle.\n'
+    ;;
+  --version)
+    printf '%s\n' "${WATCHDOG_VERSION}"
     ;;
   '')
     main

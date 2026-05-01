@@ -25,6 +25,9 @@ PCLOUD_DRIVE_PATH="${PCLOUD_DRIVE_PATH:-${HOME}/pCloud Drive}"
 PCLOUD_WATCHDOG_LOG_FILE="${PCLOUD_WATCHDOG_LOG_FILE:-${LOG_DIR}/pcloud-drive-watchdog.log}"
 PCLOUD_STATE_DIR="${PCLOUD_STATE_DIR:-${HOME}/Library/Application Support/pcloud-drive-watchdog}"
 PCLOUD_VERBOSE="${PCLOUD_VERBOSE:-0}"
+PCLOUD_QUIT_EVENT_TIMEOUT_SECONDS="${PCLOUD_QUIT_EVENT_TIMEOUT_SECONDS:-5}"
+PCLOUD_QUIT_WAIT_SECONDS="${PCLOUD_QUIT_WAIT_SECONDS:-8}"
+PCLOUD_FORCE_KILL_WAIT_SECONDS="${PCLOUD_FORCE_KILL_WAIT_SECONDS:-2}"
 NO_LAUNCH="${NO_LAUNCH:-0}"
 FORCE="${FORCE:-0}"
 
@@ -53,6 +56,10 @@ detect_pcloud_app() {
   fi
 
   printf '%s\n' "${detected_path}"
+}
+
+watchdog_version() {
+  "${SOURCE_SCRIPT}" --version
 }
 
 prompt_interval() {
@@ -215,6 +222,7 @@ main() {
   mkdir -p "${INSTALL_BIN_DIR}" "${LOG_DIR}" "${LAUNCH_AGENTS_DIR}"
   cp "${SOURCE_SCRIPT}" "${INSTALLED_SCRIPT}"
   chmod 755 "${INSTALLED_SCRIPT}"
+  script_version="$(watchdog_version)"
 
   info "Generating LaunchAgent plist"
   cp "${PLIST_TEMPLATE}" "${INSTALLED_PLIST}"
@@ -229,6 +237,9 @@ main() {
   replace_token "__PCLOUD_FAILURE_THRESHOLD__" "${failure_threshold}" "${INSTALLED_PLIST}"
   replace_token "__PCLOUD_STATE_DIR__" "${PCLOUD_STATE_DIR}" "${INSTALLED_PLIST}"
   replace_token "__PCLOUD_VERBOSE__" "${PCLOUD_VERBOSE}" "${INSTALLED_PLIST}"
+  replace_token "__PCLOUD_QUIT_EVENT_TIMEOUT_SECONDS__" "${PCLOUD_QUIT_EVENT_TIMEOUT_SECONDS}" "${INSTALLED_PLIST}"
+  replace_token "__PCLOUD_QUIT_WAIT_SECONDS__" "${PCLOUD_QUIT_WAIT_SECONDS}" "${INSTALLED_PLIST}"
+  replace_token "__PCLOUD_FORCE_KILL_WAIT_SECONDS__" "${PCLOUD_FORCE_KILL_WAIT_SECONDS}" "${INSTALLED_PLIST}"
 
   info "Validating generated LaunchAgent"
   plutil -lint "${INSTALLED_PLIST}" >/dev/null
@@ -240,6 +251,7 @@ main() {
       printf 'Generated %s without loading launchd service because NO_LAUNCH=1\n' "${INSTALLED_PLIST}"
     fi
     printf 'Script: %s\n' "${INSTALLED_SCRIPT}"
+    printf 'Version: %s\n' "${script_version}"
     printf 'Interval: %s seconds\n' "${interval_seconds}"
     printf 'Consecutive failed checks: %s\n' "${failure_threshold}"
     printf 'pCloud app: %s\n' "${pcloud_app_path}"
@@ -258,6 +270,7 @@ main() {
     printf 'Installed %s\n' "${LABEL}"
   fi
   printf 'Script: %s\n' "${INSTALLED_SCRIPT}"
+  printf 'Version: %s\n' "${script_version}"
   printf 'LaunchAgent: %s\n' "${INSTALLED_PLIST}"
   printf 'Interval: %s seconds\n' "${interval_seconds}"
   printf 'Consecutive failed checks: %s\n' "${failure_threshold}"
