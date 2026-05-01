@@ -3,8 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project follows a simple date-based release workflow until tagged
-releases are introduced.
+and this project follows semantic versioning for tagged releases.
 
 ## [Unreleased]
 

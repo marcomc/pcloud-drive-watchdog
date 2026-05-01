@@ -1,11 +1,11 @@
 # Project Agent Rules
 
-Follow `/Users/mmassari/AGENTS.md` for the canonical user-wide policy.
+Follow `~/AGENTS.md` for the canonical user-wide policy.
 
 ## Required Validation
 
 - Run `markdownlint` on every Markdown file you create or edit, using
-  `/Users/mmassari/.markdownlint.json`.
+  `~/.markdownlint.json`.
 - Run `shellcheck --enable=all` on every shell script you create or edit.
 - Fix findings instead of silencing them unless suppression is justified.
 
@@ -20,7 +20,7 @@ Follow `/Users/mmassari/AGENTS.md` for the canonical user-wide policy.
 ## Versioning
 
 - The canonical software version lives in
-  [src/pcloud-drive-watchdog.sh](/Users/mmassari/Development/pcloud-drive-watchdog/src/pcloud-drive-watchdog.sh)
+  [src/pcloud-drive-watchdog.sh](src/pcloud-drive-watchdog.sh)
   as `WATCHDOG_VERSION`.
 - When bumping the version, update:
   `WATCHDOG_VERSION` in the runtime script,
